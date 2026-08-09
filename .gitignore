@@ -1,0 +1,31 @@
+# ---------- 依赖与构建产物 ----------
+node_modules/
+dist/
+target/
+*.jar
+*.war
+*.class
+
+# ---------- 运行日志 ----------
+logs/
+*.log
+*.log.*
+nohup.out
+
+# ---------- IDE ----------
+*.iml
+.vscode/
+*.swp
+
+# ---------- 系统文件 ----------
+.DS_Store
+Thumbs.db
+
+# ---------- 本地临时文件 ----------
+*.tmp
+.bc*/
+build-check/
+
+# ---------- 数据库 ----------
+*.sql.bak
+db_backup/

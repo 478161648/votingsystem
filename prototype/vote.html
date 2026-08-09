@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>年度投票系统 · 投票端原型</title>
+<style>
+/* ========== 基础变量（浅色，与管理端同套视觉） ========== */
+:root{
+  --bg:#eef1f6;
+  --card:#ffffff;
+  --border:#d9dfea;
+  --border-soft:#e6eaf2;
+  --text:#1c2333;
+  --text-2:#5b6474;
+  --text-3:#8b93a5;
+  --primary:#2b5fd9;
+  --primary-deep:#1d46b8;
+  --primary-soft:#e8effc;
+  --gold:#d4a017;
+  --gold-bg:#fdf6e3;
+  --orange:#e07b00;
+  --orange-bg:#fff4e5;
+  --green:#1a9c55;
+  --green-bg:#e8f7ee;
+  --red:#d63d3d;
+  --gray:#6a7383;
+  --gray-bg:#eef1f5;
+  --radius:11px;
+  --shadow:0 1px 3px rgba(28,35,51,.05),0 5px 16px -10px rgba(28,35,51,.12);
+  --shadow-hover:0 4px 10px rgba(28,35,51,.07),0 12px 26px -12px rgba(28,35,51,.18);
+  --font:"Microsoft YaHei","PingFang SC","Noto Sans SC","Segoe UI",system-ui,sans-serif;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:14px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit}
+.hidden{display:none!important}
+.muted{color:var(--text-2)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.card{animation:fadeUp .4s var(--ease) both}
+.stagger>*{animation:fadeUp .3s var(--ease) both}
+.stagger>*:nth-child(1){animation-delay:.01s}
+.stagger>*:nth-child(2){animation-delay:.04s}
+.stagger>*:nth-child(3){animation-delay:.07s}
+.stagger>*:nth-child(4){animation-delay:.1s}
+
+.card{background:var(--card);border:1px solid var(--border-soft);border-radius:var(--radius);box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  font-size:.95rem;font-weight:700;border-radius:9px;padding:11px 26px;
+  transition:all .18s var(--ease);white-space:nowrap;border:1.5px solid transparent}
+.btn:active{transform:scale(.96)}
+.btn:disabled{opacity:.38;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:0 3px 12px -3px rgba(43,95,217,.55)}
+.btn-primary:hover:not(:disabled){background:var(--primary-deep);transform:translateY(-1px)}
+.btn-lg{padding:13px 38px;font-size:1.05rem;border-radius:10px}
+
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;font-weight:800;border-radius:999px;padding:4px 13px}
+.badge .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.badge-open{background:var(--green-bg);color:var(--green)}
+.badge-open .dot{animation:pulse 1.4s infinite}
+.badge-revote{background:var(--orange-bg);color:var(--orange)}
+.badge-revote .dot{animation:pulse 1.4s infinite}
+.badge-tallied{background:var(--primary-soft);color:var(--primary-deep)}
+.badge-archived{background:var(--gray-bg);color:var(--gray)}
+
+/* ========== 登录页 ========== */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{width:100%;max-width:430px;padding:40px 40px 34px;text-align:center}
+.login-logo{width:56px;height:56px;border-radius:14px;margin:0 auto 16px;
+  background:linear-gradient(135deg,var(--primary),var(--primary-deep));
+  display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 5px 16px -4px rgba(43,95,217,.5)}
+.login-title{font-size:1.4rem;font-weight:800;margin-bottom:4px}
+.login-sub{font-size:.88rem;color:var(--text-2);margin-bottom:30px}
+.field{text-align:left;margin-bottom:16px}
+.field-label{font-size:.85rem;font-weight:700;color:var(--text-2);margin-bottom:6px;display:block}
+.field-input{width:100%;padding:12px 14px;font-size:1rem;border:2px solid var(--border);border-radius:10px;
+  background:var(--card);outline:none;transition:all .2s;text-align:center;letter-spacing:2px}
+.field-input:focus{border-color:var(--primary);box-shadow:0 0 0 4px rgba(43,95,217,.12)}
+.login-btn{width:100%;margin-top:8px}
+.login-hint{font-size:.8rem;color:var(--text-3);margin-top:18px;line-height:1.7}
+
+/* ========== 顶部栏 ========== */
+.topbar{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border-soft);box-shadow:0 1px 6px rgba(28,35,51,.04);
+  padding:0 20px;height:56px;display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:9px;font-size:1.08rem;font-weight:800;white-space:nowrap}
+.brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--primary-deep));
+  display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 10px -2px rgba(43,95,217,.5)}
+.theme-switch{margin-left:14px;display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--text-2);font-weight:600}
+.theme-switch select{font-size:.9rem;font-weight:700;color:var(--text);padding:7px 12px;border:1.5px solid var(--border);
+  border-radius:8px;background:var(--card);outline:none;transition:border-color .2s}
+.theme-switch select:focus{border-color:var(--primary)}
+.user-chip{margin-left:auto;display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--primary-soft);
+  border-radius:999px;font-weight:800;color:var(--primary-deep);font-size:.92rem}
+.user-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+
+/* ========== 主体：宽屏两栏 ========== */
+.main{max-width:1380px;margin:0 auto;padding:14px 18px 66px}
+.ctrl-grid{display:grid;grid-template-columns:1fr 290px;gap:14px;align-items:start}
+
+/* 左侧列 */
+.left-col{display:flex;flex-direction:column;gap:10px}
+.theme-card{padding:12px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.theme-name{font-size:1.28rem;font-weight:800}
+.theme-tip{font-size:.86rem;color:var(--text-2);font-weight:600}
+.theme-progress{display:flex;align-items:center;gap:9px;font-size:.84rem;font-weight:700;color:var(--text-2)}
+.progress-track{width:100px;height:9px;background:var(--bg);border-radius:999px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),#4f8cff);border-radius:999px;transition:width .6s var(--ease)}
+
+/* 顶部提醒条 */
+.vote-hint{display:flex;align-items:center;gap:10px;padding:10px 18px;border-radius:10px;
+  background:var(--primary-soft);border:1px solid #c6d6f5;color:var(--primary-deep);
+  font-size:.9rem;font-weight:700;min-height:42px}
+.vote-hint.warn{background:var(--orange-bg);border-color:var(--orange);color:var(--orange)}
+
+/* 分类分区 */
+.cat-section{background:var(--card);border:2px solid var(--border-soft);border-radius:12px;overflow:hidden}
+.cat-section.pick{border-color:var(--primary)}
+.cat-section.pick-revote{border-color:var(--orange)}
+.cat-head{display:flex;align-items:center;gap:12px;padding:9px 16px;
+  background:linear-gradient(90deg,var(--primary-soft),transparent);border-bottom:1.5px solid var(--border-soft)}
+.cat-head.revote-head{background:linear-gradient(90deg,var(--orange-bg),transparent)}
+.cat-no{width:28px;height:28px;border-radius:8px;background:var(--primary);color:#fff;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:.92rem;font-weight:800;
+  box-shadow:0 2px 8px -2px rgba(43,95,217,.5)}
+.cat-section.pick-revote .cat-no{background:var(--orange);box-shadow:0 2px 8px -2px rgba(224,123,0,.5)}
+.cat-name{font-size:1rem;font-weight:800}
+.cat-quota-tag{font-size:.76rem;font-weight:800;padding:3px 11px;border-radius:999px;background:var(--gray-bg);color:var(--gray)}
+.cat-count{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:.8rem;font-weight:800}
+.cat-count .c-done{color:var(--primary)}
+.cat-count .c-left{color:var(--orange)}
+.cat-count .c-ok{color:var(--green)}
+.cand-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;padding:11px 13px}
+.cand-row{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:9px;
+  border:1.5px solid var(--border-soft);background:var(--card);cursor:pointer;
+  transition:all .18s var(--ease);text-align:left;width:100%}
+.cand-row:hover{border-color:#b9c6dd;transform:translateY(-1px);box-shadow:var(--shadow-hover)}
+.cand-row.selected{border-color:var(--primary);background:var(--primary-soft);box-shadow:0 2px 10px -5px rgba(43,95,217,.4)}
+.cand-row.disabled{cursor:not-allowed;opacity:.6}
+.cand-check{width:22px;height:22px;border-radius:50%;border:2.5px solid var(--border);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;color:transparent;transition:all .18s;margin-top:1px}
+.cand-row.selected .cand-check{background:var(--primary);border-color:var(--primary);color:#fff}
+.cand-info{flex:1;min-width:0}
+.cand-name{font-size:.95rem;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.cand-dept{font-size:.74rem;color:var(--text-2);font-weight:600;margin-top:1px}
+.cat-tag{font-size:.72rem;font-weight:800;padding:2px 9px;border-radius:999px;background:var(--gray-bg);color:var(--gray);white-space:nowrap}
+.cat-tag.locked{background:var(--gold-bg);color:var(--gold-deep)}
+.cat-tag.revote{background:var(--orange-bg);color:var(--orange)}
+/* 自定义字段区 */
+.cand-fields{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;margin-top:8px}
+.cf{display:flex;justify-content:space-between;align-items:center;gap:6px;
+  background:var(--bg);border-radius:6px;padding:3px 8px;min-width:0}
+.cf .cf-k{font-size:.7rem;color:var(--text-3);font-weight:700;white-space:nowrap;flex-shrink:0}
+.cf .cf-v{font-size:.74rem;font-weight:800;color:var(--text);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cf.wide{grid-column:1/-1}
+.cf.wide .cf-v{white-space:normal;text-align:right;line-height:1.4}
+
+/* ========== 右侧常驻信息栏 ========== */
+.side-col{display:flex;flex-direction:column;gap:10px;position:sticky;top:66px}
+.info-card{padding:14px 16px}
+.info-title{font-size:.84rem;font-weight:800;color:var(--text-2);margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.sum-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.sum-item{text-align:center;padding:9px 4px;border-radius:9px;background:var(--bg)}
+.sum-item .sum-k{font-size:.7rem;color:var(--text-2);font-weight:700}
+.sum-item .sum-v{font-size:1.25rem;font-weight:800;line-height:1.2}
+
+.winner-list{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto}
+.winner-chip{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:9px;
+  background:var(--gold-bg);border:1.5px solid var(--gold);color:var(--gold-deep);
+  font-size:.88rem;font-weight:800}
+.quota-line{font-size:.86rem;color:var(--text-2);font-weight:700;line-height:1.7}
+.quota-line b{color:var(--orange);font-size:1rem}
+.empty-line{font-size:.82rem;color:var(--text-3);font-weight:600;line-height:1.6}
+
+.submit-box{margin-top:auto;padding:11px 16px 13px;text-align:center}
+.submit-box .btn{width:100%}
+.submit-tip{font-size:.76rem;color:var(--text-3);font-weight:600;margin-top:7px}
+
+.voted-ok{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:10px;
+  background:var(--green-bg);border:1.5px solid var(--green);color:var(--green);
+  font-size:.92rem;font-weight:800}
+.voted-ok .ico{width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* 结果视图 */
+.result-card{padding:16px 18px}
+.result-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:13px}
+.result-title{font-size:1.1rem;font-weight:800}
+.result-rank{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px}
+.rr{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1.5px solid var(--border-soft);border-radius:10px}
+.rr.win{border-color:var(--gold);background:linear-gradient(90deg,var(--gold-bg),#fff)}
+.rr-no{width:30px;height:30px;border-radius:50%;background:var(--bg);display:flex;align-items:center;
+  justify-content:center;font-size:.92rem;font-weight:800;color:var(--text-2);flex-shrink:0}
+.rr.win .rr-no{background:var(--gold);color:#fff}
+.rr-info{flex:1;min-width:0}
+.rr-name{font-size:.98rem;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rr-dept{font-size:.76rem;color:var(--text-2);font-weight:600}
+.rr-votes{font-size:1.15rem;font-weight:800;text-align:center;min-width:66px}
+.rr-votes .u{font-size:.7rem;color:var(--text-3);font-weight:600}
+.win-tag{display:inline-flex;align-items:center;gap:4px;font-size:.76rem;font-weight:800;padding:2px 11px;border-radius:999px;background:var(--gold);color:#fff}
+
+/* 演示控制条 */
+.demo-bar{position:fixed;left:0;right:0;bottom:0;z-index:200;background:rgba(28,35,51,.92);
+  backdrop-filter:blur(8px);color:#fff;padding:8px 18px;display:flex;align-items:center;gap:8px;
+  flex-wrap:wrap;justify-content:center}
+.demo-bar .lab{font-size:.8rem;font-weight:700;opacity:.8;margin-right:4px}
+.demo-bar .dbtn{padding:6px 14px;border-radius:8px;font-size:.84rem;font-weight:700;color:#fff;
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);transition:all .15s}
+.demo-bar .dbtn:hover{background:rgba(255,255,255,.3)}
+
+@media (max-width:1080px){
+  .ctrl-grid{grid-template-columns:1fr}
+  .side-col{position:static}
+  .cand-list{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= 登录页 ================= -->
+<section id="login-view">
+  <div class="login-wrap">
+    <div class="card login-card">
+      <div class="login-logo">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="login-title">年度投票系统</div>
+      <div class="login-sub">请输入您的账号编号登录投票</div>
+      <div class="field">
+        <label class="field-label">账号编号</label>
+        <input class="field-input" id="login-no" placeholder="001" maxlength="3" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label class="field-label">密码</label>
+        <input class="field-input" id="login-pwd" type="password" placeholder="•••" maxlength="10">
+      </div>
+      <button class="btn btn-primary btn-lg login-btn" onclick="doLogin()">进入投票</button>
+      <div class="login-hint">账号编号由管理员预置（001…）<br>初始密码统一为 <b>123</b>，无需修改</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 投票主页 ================= -->
+<section id="vote-view" class="hidden">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <span>年度投票系统</span>
+    </div>
+    <div class="theme-switch">
+      <span>当前主题</span>
+      <select id="theme-select" onchange="switchTheme(this.value)">
+        <option value="dept">部门评选（优秀 · 26）</option>
+        <option value="good">良好部门（20 自动带出）</option>
+        <option value="staff">十佳员工</option>
+      </select>
+    </div>
+    <div class="user-chip"><span class="dot"></span><span id="user-no">001</span></div>
+  </header>
+
+  <main class="main">
+    <!-- 顶部：主题行 -->
+    <div class="card theme-card" style="margin-bottom:10px">
+      <span class="theme-name" id="theme-name">部门评选</span>
+      <span id="theme-status" class="badge badge-open"><span class="dot"></span>投票中</span>
+      <span class="theme-tip" id="theme-tip">业务部门 3 名 + 利润中心 2 名 + 成本中心 1 名</span>
+      <div class="theme-progress" id="prog-box">
+        <span>参与</span>
+        <div class="progress-track"><div id="prog-fill" class="progress-fill" style="width:80%"></div></div>
+        <span id="prog-text">12/15</span>
+      </div>
+    </div>
+
+    <div class="ctrl-grid">
+      <!-- ===== 左列 ===== -->
+      <div class="left-col">
+        <div id="vote-hint" class="vote-hint">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>投票进行中，得票结果保密 · 请独立作出您的选择</span>
+        </div>
+
+        <div id="cat-sections"><!-- JS 渲染 --></div>
+
+        <div id="result-view" class="card result-card hidden">
+          <div class="result-head">
+            <span class="result-title" id="result-title">投票结果</span>
+            <span id="result-status" class="badge badge-tallied">已统计</span>
+          </div>
+          <div class="result-rank" id="result-rank"><!-- JS 渲染 --></div>
+        </div>
+      </div>
+
+      <!-- ===== 右列 ===== -->
+      <div class="side-col">
+        <div id="voted-ok" class="voted-ok hidden">
+          <div class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div><span id="voted-text">投票成功，感谢参与！</span></div>
+        </div>
+
+        <div class="card info-card">
+          <div class="info-title">我的选择</div>
+          <div class="sum-grid">
+            <div class="sum-item"><div class="sum-k">总名额</div><div class="sum-v" id="sum-total">6</div></div>
+            <div class="sum-item"><div class="sum-k">已选</div><div class="sum-v" id="sum-done" style="color:var(--primary)">0</div></div>
+            <div class="sum-item"><div class="sum-k">待选</div><div class="sum-v" id="sum-left" style="color:var(--orange)">6</div></div>
+          </div>
+        </div>
+
+        <div class="card info-card">
+          <div class="info-title">已当选名单</div>
+          <div class="winner-list" id="winner-list">
+            <div class="empty-line">尚未统计，暂无当选</div>
+          </div>
+        </div>
+
+        <div class="card info-card">
+          <div class="info-title">空缺名额</div>
+          <div class="quota-line" id="quota-line">等待统计后显示</div>
+        </div>
+
+        <div class="card submit-box">
+          <button id="submit-btn" class="btn btn-primary btn-lg" onclick="submitVote()" disabled>提交投票</button>
+          <div class="submit-tip" id="submit-tip">请从各分类中选满名额后提交</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ================= 演示控制条（原型专用，正式版无） ================= -->
+<div class="demo-bar">
+  <span class="lab">原型演示 · 模拟管理员动作：</span>
+  <button class="dbtn" onclick="demoStart()">开始投票</button>
+  <button class="dbtn" onclick="demoTally()">统计(平票)</button>
+  <button class="dbtn" onclick="demoRevote()">发起重投</button>
+  <button class="dbtn" onclick="demoTally2()">统计(解除)</button>
+  <button class="dbtn" onclick="demoEnd()">结束归档</button>
+  <button class="dbtn" onclick="demoReset()">重置</button>
+</div>
+
+<script>
+/* ================= 主题数据 ================= */
+function genDeptCands(){
+  const groups = [
+    {cat:'业务部门', names:['市场一部','市场二部','市场三部','销售一部','销售二部','渠道管理部','电商事业部','大客户部','国际业务部','华东分公司','华南分公司','华北分公司','西南分公司','售后服务中心']},
+    {cat:'利润中心', names:['金融事业部','数据中心','物流事业部','软件事业部','咨询事业部','资本运营部']},
+    {cat:'成本中心', names:['财务管理部','人力资源部','行政管理部','法务合规部','审计监察部','信息技术部']}
+  ];
+  const owners = ['张明','李强','王芳','刘洋','陈静','赵磊','孙丽','周涛','吴敏','郑浩','冯雪','蒋峰','沈燕','韩磊','曹斌','邓丽'];
+  const notes = ['年度目标超额完成','重点项目建设突出','客户满意度领先','成本管控成效显著','创新成果丰硕','协同支持评价高','安全运营零事故','人才梯队建设完善'];
+  const cands = [];
+  let id = 0;
+  groups.forEach((g,ci)=>{
+    g.names.forEach((nm,ni)=>{
+      cands.push({
+        id, name:nm, dept:nm, cat:ci, win:false, tie:false,
+        votes: 0,
+        extra: [
+          ['负责人', owners[(id*3+ci)%owners.length]],
+          ['团队规模', (20+(id*7)%90)+' 人'],
+          ['年度产值', (500+(id*173)%2600)+' 万元'],
+          ['备注', notes[(id+ci)%notes.length]]
+        ]
+      });
+      id++;
+    });
+  });
+  return cands;
+}
+
+/* 良好部门：候选自动 = 部门评选(优秀) 全部候选 − 已当选者 */
+function genGoodCands(){
+  const excelWinners = [0,1,4,14,15,20]; // 部门评选已当选 id（市场一/二部、销售二部、金融、数据中心、财务）
+  const all = genDeptCands();
+  const rest = all.filter(c=>!excelWinners.includes(c.id));
+  // 重排 id，并按分类聚合保持分区
+  const groups = [[],[],[]];
+  rest.forEach(c=>groups[c.cat].push(c));
+  const out = [];
+  groups.forEach(gl=>{
+    gl.forEach(c=>{
+      out.push({...c, id: out.length, votes: 0});
+    });
+  });
+  return out;
+}
+
+const THEMES = {
+  dept: {
+    name:'部门评选',
+    tip:'业务部门 3 名 + 利润中心 2 名 + 成本中心 1 名',
+    cats:[{name:'业务部门',quota:3},{name:'利润中心',quota:2},{name:'成本中心',quota:1}],
+    cands: genDeptCands(),
+    totalQuota: 6,
+    demo:{ // 业务部门：市场一部/市场二部当选，销售一部/销售二部平票争第 3 席
+      tallyWins:[0,1,14,15,20],
+      tallyTies:[3,4],
+      revoteKeepWins:[0,1,14,15,20],
+      tally2Wins:[4],
+      tally2ClearTie:[3],
+      tallyMsg:'管理员已统计：业务部门 销售一部、销售二部并列，待平票重投（争第 3 席）',
+      tally2Msg:'管理员已统计：平票解除，销售二部当选'
+    }
+  },
+  good: {
+    name:'良好部门',
+    tip:'业务部门 3 名 + 利润中心 2 名 + 成本中心 1 名 · 候选 = 优秀未当选部门（自动带出）',
+    cats:[{name:'业务部门',quota:3},{name:'利润中心',quota:2},{name:'成本中心',quota:1}],
+    cands: genGoodCands(),
+    totalQuota: 6,
+    demo:{ // 业务部门：市场三部/销售一部当选，渠道管理部/电商事业部平票争第 3 席
+      tallyWins:[0,1,11,12],
+      tallyTies:[2,3],
+      revoteKeepWins:[0,1,11,12],
+      tally2Wins:[3],
+      tally2ClearTie:[2],
+      tallyMsg:'管理员已统计：业务部门 渠道管理部、电商事业部并列，待平票重投（争第 3 席）',
+      tally2Msg:'管理员已统计：平票解除，电商事业部当选'
+    }
+  },
+  staff: {
+    name:'十佳员工',
+    tip:'生产序列 1 名 + 技术序列 1 名',
+    cats:[{name:'生产序列',quota:1},{name:'技术序列',quota:1}],
+    cands:[
+      {id:0, name:'王建国', dept:'生产一部', cat:0, win:false, tie:false, votes:10, extra:[['所属部门','生产一部'],['去年考核','优秀 (92)'],['前年考核','良好 (86)'],['考评得分','90.5'],['在职年限','8 年'],['备注','连续三年绩效 A 级']]},
+      {id:1, name:'李桂芳', dept:'生产二部', cat:0, win:false, tie:true, votes:10, extra:[['所属部门','生产二部'],['去年考核','优秀 (91)'],['前年考核','优秀 (90)'],['考评得分','91.2'],['在职年限','11 年'],['备注','班组安全零事故']]},
+      {id:2, name:'张伟', dept:'技术部', cat:1, win:false, tie:false, votes:8, extra:[['所属部门','技术部'],['去年考核','优秀 (93)'],['前年考核','良好 (88)'],['考评得分','92.8'],['在职年限','7 年'],['备注','主导两项技改项目']]},
+      {id:3, name:'刘洋', dept:'技术部', cat:1, win:false, tie:true, votes:7, extra:[['所属部门','技术部'],['去年考核','良好 (88)'],['前年考核','优秀 (90)'],['考评得分','89.6'],['在职年限','5 年'],['备注','专利 3 项']]},
+      {id:4, name:'陈静', dept:'研发中心', cat:1, win:false, tie:false, votes:6, extra:[['所属部门','研发中心'],['去年考核','优秀 (90)'],['前年考核','优秀 (91)'],['考评得分','90.9'],['在职年限','9 年'],['备注','省级课题负责人']]},
+      {id:5, name:'赵磊', dept:'质检部', cat:1, win:false, tie:false, votes:5, extra:[['所属部门','质检部'],['去年考核','良好 (87)'],['前年考核','良好 (85)'],['考评得分','86.4'],['在职年限','6 年'],['备注','质检流程优化']]}
+    ],
+    totalQuota: 2,
+    demo:{
+      tallyWins:[2],
+      tallyTies:[0,1],
+      revoteKeepWins:[],
+      tally2Wins:[1],
+      tally2ClearTie:[0],
+      tallyMsg:'管理员已统计：生产序列 王建国、李桂芳并列 10 票，待平票重投',
+      tally2Msg:'管理员已统计：平票解除，李桂芳当选'
+    }
+  }
+};
+
+/* ================= 状态 ================= */
+let curKey = 'dept';
+let user = null;
+let phase = 'OPEN';       // OPEN | REVOTE | TALLIED | ARCHIVED
+let voted = false;
+let selected = new Set();
+const C = ()=>THEMES[curKey].cands;
+const CATS = ()=>THEMES[curKey].cats;
+
+/* ================= 登录 ================= */
+function doLogin(){
+  const no = document.getElementById('login-no').value.trim();
+  const pwd = document.getElementById('login-pwd').value;
+  if(!/^\d{3}$/.test(no)){ alert('请输入三位账号编号，如 001'); return; }
+  if(pwd !== '123'){ alert('密码错误，初始密码统一为 123'); return; }
+  user = no;
+  document.getElementById('user-no').textContent = no;
+  document.getElementById('login-view').classList.add('hidden');
+  document.getElementById('vote-view').classList.remove('hidden');
+  demoReset();
+}
+function switchTheme(k){
+  curKey = k;
+  document.getElementById('theme-select').value = k;
+  demoReset();
+}
+
+/* ================= 渲染 ================= */
+function phaseCfg(){
+  return {
+    OPEN : {status:'投票中',     badge:'badge-open',    hint:'投票进行中，得票结果保密 · 请独立作出您的选择'},
+    REVOTE:{status:'平票重投中', badge:'badge-revote',  hint:'平票重投中 · 请为并列候选重新投票'},
+    TALLIED:{status:'已统计',    badge:'badge-tallied', hint:'本主题已统计完成，请查看结果'},
+    ARCHIVED:{status:'已归档',   badge:'badge-archived',hint:'本主题已归档，请查看结果'}
+  };
+}
+
+function render(){
+  const T = THEMES[curKey];
+  const cfg = phaseCfg()[phase];
+  document.getElementById('theme-name').textContent = T.name;
+  document.getElementById('theme-tip').textContent = T.tip;
+  const st = document.getElementById('theme-status');
+  st.className = 'badge '+cfg.badge;
+  st.innerHTML = '<span class="dot"></span>'+cfg.status;
+
+  const hint = document.getElementById('vote-hint');
+  hint.classList.toggle('warn', phase==='REVOTE');
+  const ico = phase==='REVOTE'
+    ? '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>'
+    : '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';
+  hint.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">'+ico+'</svg><span>'+cfg.hint+'</span>';
+
+  document.getElementById('prog-box').classList.toggle('hidden', phase==='TALLIED'||phase==='ARCHIVED');
+  document.getElementById('voted-ok').classList.toggle('hidden', !voted);
+
+  const showList = (phase==='OPEN'||phase==='REVOTE');
+  document.getElementById('cat-sections').classList.toggle('hidden', !showList);
+  document.getElementById('result-view').classList.toggle('hidden', showList);
+
+  if(showList){
+    renderCands();
+  }else{
+    const rs = document.getElementById('result-status');
+    rs.className = 'badge '+(phase==='ARCHIVED'?'badge-archived':'badge-tallied');
+    rs.textContent = phase==='ARCHIVED' ? '已归档' : '已统计';
+    document.getElementById('result-title').textContent = '投票结果 · '+T.name;
+    renderResult();
+  }
+  renderSide();
+}
+
+/* 左列：分类分区 */
+function renderCands(){
+  const root = document.getElementById('cat-sections');
+  root.innerHTML = '';
+  const T = THEMES[curKey];
+  const voting = (phase==='OPEN'||phase==='REVOTE') && !voted;
+
+  T.cats.forEach((cat, ci)=>{
+    const catCands = C().filter(c=>c.cat===ci);
+    if(phase==='REVOTE' && !voted && !catCands.some(c=>c.tie||c.win)) return;
+    const isRevoteCat = phase==='REVOTE' && !voted && catCands.some(c=>c.tie);
+
+    const sec = document.createElement('div');
+    sec.className = 'cat-section '+(isRevoteCat?'pick-revote':'pick');
+    const head = document.createElement('div');
+    head.className = 'cat-head'+(isRevoteCat?' revote-head':'');
+    const cno = ['一','二','三','四','五','六'][ci];
+    const inCat = catCands.filter(c=>selected.has(c.id)).length;
+    const left = cat.quota - inCat;
+    const doneCls = left<=0 ? 'c-ok' : 'c-left';
+    head.innerHTML =
+      '<span class="cat-no">'+cno+'</span>'+
+      '<span class="cat-name">'+cat.name+'</span>'+
+      '<span class="cat-quota-tag">'+(isRevoteCat?'重投名额':'名额')+' '+cat.quota+' 名</span>'+
+      '<span class="cat-count">已选 <span class="c-done">'+inCat+'</span> · 待选 <span class="'+doneCls+'">'+Math.max(left,0)+'</span></span>';
+    sec.appendChild(head);
+
+    const list = document.createElement('div');
+    list.className = 'cand-list stagger';
+    catCands.forEach(c=>{
+      if(phase==='REVOTE' && !voted && !c.tie && !c.win) return;
+      const row = document.createElement('button');
+      row.className = 'cand-row';
+      let tag = '';
+      if(c.win && (phase==='REVOTE'||phase==='TALLIED'||phase==='ARCHIVED')){
+        tag = '<span class="cat-tag locked">✓ 已当选</span>';
+      }else if(c.tie && phase==='REVOTE'){
+        tag = '<span class="cat-tag revote">重投中</span>';
+      }
+      const selectable = voting && (phase!=='REVOTE' ? true : c.tie);
+      if(!selectable) row.classList.add('disabled');
+      if(selected.has(c.id)) row.classList.add('selected');
+      let fields = '';
+      if(c.extra && c.extra.length){
+        fields = '<div class="cand-fields">';
+        c.extra.forEach((f,i)=>{
+          const wide = (i===c.extra.length-1) && f[0]==='备注';
+          fields += '<div class="cf'+(wide?' wide':'')+'"><span class="cf-k">'+f[0]+'</span><span class="cf-v">'+f[1]+'</span></div>';
+        });
+        fields += '</div>';
+      }
+      row.innerHTML =
+        '<span class="cand-check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>'+
+        '<span class="cand-info"><span class="cand-name">'+c.name+' '+tag+'</span>'+
+        '<span class="cand-dept">'+c.dept+'</span>'+fields+'</span>';
+      if(selectable) row.onclick = ()=>toggleSel(c.id);
+      list.appendChild(row);
+    });
+    sec.appendChild(list);
+    root.appendChild(sec);
+  });
+}
+
+function toggleSel(id){
+  const c = C().find(x=>x.id===id);
+  const T = THEMES[curKey];
+  if(selected.has(id)){ selected.delete(id); }
+  else{
+    const cat = T.cats[c.cat];
+    const inCat = C().filter(x=>x.cat===c.cat).filter(x=>selected.has(x.id)).length;
+    if(inCat >= cat.quota){ alert('该分类最多选 '+cat.quota+' 个'); return; }
+    selected.add(id);
+  }
+  renderCands(); renderSide();
+}
+
+/* 右列 */
+function renderSide(){
+  const T = THEMES[curKey];
+  const need = phase==='REVOTE' ? 1 : T.totalQuota;
+  const done = selected.size;
+  document.getElementById('sum-total').textContent = need;
+  document.getElementById('sum-done').textContent = done;
+  document.getElementById('sum-left').textContent = Math.max(need-done,0);
+  document.getElementById('submit-btn').disabled = !(done>=need && (phase==='OPEN'||phase==='REVOTE') && !voted);
+  const tip = document.getElementById('submit-tip');
+  if(phase==='REVOTE' && !voted) tip.textContent = '为并列候选选择 1 名后提交';
+  else if(phase==='TALLIED'||phase==='ARCHIVED') tip.textContent = '投票已结束';
+  else if(voted) tip.textContent = '您已完成投票';
+  else tip.textContent = '请从各分类中选满名额后提交';
+
+  const wl = document.getElementById('winner-list');
+  const winners = C().filter(c=>c.win);
+  if(winners.length){
+    wl.innerHTML = '';
+    winners.forEach(c=>{
+      const chip = document.createElement('div');
+      chip.className = 'winner-chip';
+      chip.innerHTML = '✓ '+c.name;
+      wl.appendChild(chip);
+    });
+  }else{
+    wl.innerHTML = '<div class="empty-line">尚未统计，暂无当选</div>';
+  }
+
+  const ql = document.getElementById('quota-line');
+  if(phase==='REVOTE' && !voted){
+    ql.innerHTML = '当前空缺 <b>1</b> 名<br>（并列候选所在分类）';
+  }else if(phase==='REVOTE' && voted){
+    ql.innerHTML = '当前空缺 <b>1</b> 名<br>· 等待管理员统计';
+  }else if(phase==='TALLIED'||phase==='ARCHIVED'){
+    ql.innerHTML = '已全部选定（无空缺）';
+  }else{
+    ql.innerHTML = '等待统计后显示';
+  }
+}
+
+/* 结果榜 */
+function renderResult(){
+  const list = document.getElementById('result-rank');
+  list.innerHTML = '';
+  [...C()].sort((a,b)=>b.votes-a.votes).forEach((c,idx)=>{
+    const row = document.createElement('div');
+    row.className = 'rr'+(c.win?' win':'');
+    row.innerHTML =
+      '<span class="rr-no">'+(idx+1)+'</span>'+
+      '<span class="rr-info"><span class="rr-name">'+c.name+' '+(c.win?'<span class="win-tag">✓ 当选</span>':'')+'</span>'+
+      '<span class="rr-dept">'+c.dept+' · '+THEMES[curKey].cats[c.cat].name+'</span></span>'+
+      '<span class="rr-votes">'+c.votes+'<div class="u">票</div></span>';
+    list.appendChild(row);
+  });
+}
+
+/* ================= 提交 ================= */
+function submitVote(){
+  const T = THEMES[curKey];
+  const need = phase==='REVOTE' ? 1 : T.totalQuota;
+  if(selected.size < need){ alert('请选择 '+need+' 个候选人后再提交'); return; }
+  voted = true;
+  document.getElementById('voted-text').textContent = phase==='REVOTE' ? '重投成功，感谢参与！' : '投票成功，感谢参与！';
+  render();
+}
+
+/* ================= 演示控制 ================= */
+function demoStart(){
+  phase='OPEN'; voted=false; selected.clear();
+  C().forEach(c=>{c.win=false;c.tie=false;});
+  render();
+}
+function demoTally(){
+  const d = THEMES[curKey].demo;
+  phase='TALLIED'; voted=false; selected.clear();
+  d.tallyWins.forEach(i=>C()[i].win=true);
+  d.tallyTies.forEach(i=>C()[i].tie=true);
+  render();
+  alert(d.tallyMsg);
+}
+function demoRevote(){
+  const d = THEMES[curKey].demo;
+  phase='REVOTE'; voted=false; selected.clear();
+  d.revoteKeepWins.forEach(i=>C()[i].win=true);
+  d.tallyTies.forEach(i=>C()[i].tie=true);
+  render();
+}
+function demoTally2(){
+  const d = THEMES[curKey].demo;
+  phase='TALLIED'; voted=false; selected.clear();
+  d.tally2Wins.forEach(i=>C()[i].win=true);
+  d.tally2ClearTie.forEach(i=>C()[i].tie=false);
+  render();
+  alert(d.tally2Msg);
+}
+function demoEnd(){
+  phase='ARCHIVED'; voted=false; selected.clear();
+  render();
+}
+function demoReset(){ demoStart(); }
+</script>
+</body>
+</html>

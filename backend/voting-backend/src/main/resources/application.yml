@@ -1,0 +1,47 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: voting-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/voting?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: ""
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+    banner: false
+
+# 自定义配置
+voting:
+  jwt:
+    # 生产环境务必修改; HS256 密钥长度必须 >= 32 字节
+    secret: voting-system-secret-key-2026-please-change
+    expire-hours: 12
+  # 初始密码
+  default-password: "123"
+  # 是否启动时初始化演示账号 (super_admin/admin/001-020)
+  init-demo-accounts: true
+
+logging:
+  level:
+    com.voting: debug
+  file:
+    name: logs/voting-backend.log

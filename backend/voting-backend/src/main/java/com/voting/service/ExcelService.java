@@ -1,0 +1,210 @@
+package com.voting.service;
+
+import com.voting.common.BizException;
+import com.voting.entity.Candidate;
+import com.voting.entity.Department;
+import com.voting.entity.ThemeCategory;
+import com.voting.entity.ThemeCustomField;
+import com.voting.mapper.CandidateMapper;
+import com.voting.mapper.DepartmentMapper;
+import com.voting.mapper.ThemeCategoryMapper;
+import com.voting.mapper.ThemeCustomFieldMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddressList;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.*;
+
+/**
+ * 候选人 Excel 模板导入导出 (POI, 动态列 = 名称+所属部门+分类+自定义字段)
+ */
+@Service
+public class ExcelService {
+
+    private final ThemeCustomFieldMapper fieldMapper;
+    private final ThemeCategoryMapper categoryMapper;
+    private final DepartmentMapper departmentMapper;
+    private final CandidateMapper candidateMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public ExcelService(ThemeCustomFieldMapper fieldMapper, ThemeCategoryMapper categoryMapper,
+                        DepartmentMapper departmentMapper, CandidateMapper candidateMapper) {
+        this.fieldMapper = fieldMapper;
+        this.categoryMapper = categoryMapper;
+        this.departmentMapper = departmentMapper;
+        this.candidateMapper = candidateMapper;
+    }
+
+    /** 导出模板: 列 = 排序 + 分类 + 所属部门 + 候选项 + 自定义字段 (与前端表格列顺序一致) */
+    public void exportTemplate(Long themeId, OutputStream out) throws Exception {
+        List<ThemeCustomField> fields = fieldMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ThemeCustomField>()
+                        .eq(ThemeCustomField::getThemeId, themeId)
+                        .orderByAsc(ThemeCustomField::getSort));
+        List<ThemeCategory> cats = categoryMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ThemeCategory>()
+                        .eq(ThemeCategory::getThemeId, themeId)
+                        .orderByAsc(ThemeCategory::getSort));
+        List<Department> depts = departmentMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Department>()
+                        .orderByAsc(Department::getSort));
+
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet sheet = wb.createSheet("候选人模板");
+            // 表头: 排序 | [分类] | 所属部门 | 候选项 | 自定义字段...
+            List<String> headers = new ArrayList<>();
+            headers.add("排序");
+            if (!cats.isEmpty()) {
+                headers.add("分类");
+            }
+            headers.add("所属部门*");
+            headers.add("候选项*");
+            for (ThemeCustomField f : fields) {
+                headers.add(f.getFieldLabel() + (Boolean.TRUE.equals(f.getIsRequired()) ? "*" : ""));
+            }
+            Row headRow = sheet.createRow(0);
+            CellStyle headStyle = wb.createCellStyle();
+            Font headFont = wb.createFont();
+            headFont.setBold(true);
+            headStyle.setFont(headFont);
+            for (int i = 0; i < headers.size(); i++) {
+                Cell c = headRow.createCell(i);
+                c.setCellValue(headers.get(i));
+                c.setCellStyle(headStyle);
+                sheet.setColumnWidth(i, 16 * 256);
+            }
+            // 示例行
+            Row demo = sheet.createRow(1);
+            int demoCol = 0;
+            demo.createCell(demoCol++).setCellValue(1);                    // 排序
+            if (!cats.isEmpty()) {
+                demo.createCell(demoCol++).setCellValue(cats.get(0).getName()); // 分类
+            }
+            demo.createCell(demoCol++).setCellValue(depts.isEmpty() ? "" : depts.get(0).getName()); // 所属部门
+            demo.createCell(demoCol++).setCellValue("示例候选项");            // 候选项
+            for (ThemeCustomField f : fields) {
+                demo.createCell(demoCol++).setCellValue("示例值");
+            }
+            // 所属部门下拉 (数据校验)
+            if (!depts.isEmpty()) {
+                DataValidationHelper helper = sheet.getDataValidationHelper();
+                String formula = "\"" + depts.stream().map(Department::getName)
+                        .reduce((a, b) -> a + "," + b).orElse("") + "\"";
+                if (formula.length() < 255) {
+                    DataValidationConstraint constraint = helper.createFormulaListConstraint(formula);
+                    // 所属部门列: 有分类时在 index 2, 无分类时在 index 1
+                    int deptCol = cats.isEmpty() ? 1 : 2;
+                    CellRangeAddressList range = new CellRangeAddressList(1, 1000, deptCol, deptCol);
+                    DataValidation validation = helper.createValidation(constraint, range);
+                    sheet.addValidationData(validation);
+                }
+            }
+            wb.write(out);
+        }
+    }
+
+    /** 导入: 覆盖模式(先删除该主题全部候选项, 再插入 Excel 数据); 错误行跳过并汇总返回 */
+    public Map<String, Object> importCandidates(Long themeId, MultipartFile file) throws Exception {
+        List<ThemeCustomField> fields = fieldMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ThemeCustomField>()
+                        .eq(ThemeCustomField::getThemeId, themeId)
+                        .orderByAsc(ThemeCustomField::getSort));
+        List<ThemeCategory> cats = categoryMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ThemeCategory>()
+                        .eq(ThemeCategory::getThemeId, themeId)
+                        .orderByAsc(ThemeCategory::getSort));
+        Map<String, Department> deptMap = new HashMap<>();
+        for (Department d : departmentMapper.selectList(null)) {
+            deptMap.put(d.getName(), d);
+        }
+        Map<String, ThemeCategory> catMap = new HashMap<>();
+        for (ThemeCategory c : cats) {
+            catMap.put(c.getName(), c);
+        }
+
+        // 覆盖模式: 先删除该主题已有候选项
+        candidateMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Candidate>()
+                .eq(Candidate::getThemeId, themeId));
+
+        List<String> errors = new ArrayList<>();
+        int success = 0;
+        try (InputStream in = file.getInputStream(); Workbook wb = WorkbookFactory.create(in)) {
+            Sheet sheet = wb.getSheetAt(0);
+            int firstRow = sheet.getFirstRowNum() + 1; // 跳过表头
+            for (int r = firstRow; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                // 列索引: 排序=0 | [分类] | 所属部门 | 候选项 | 自定义字段...
+                int colIdx = 0;
+                String sortStr = getCell(row, colIdx++);
+                String catName = cats.isEmpty() ? null : getCell(row, colIdx++);
+                String deptName = getCell(row, colIdx++);
+                String name = getCell(row, colIdx++);
+                if (name == null || name.isBlank()) continue; // 空行跳过
+
+                try {
+                    if (deptName == null || deptName.isBlank() || !deptMap.containsKey(deptName)) {
+                        throw new BizException("所属部门不存在: " + deptName);
+                    }
+                    Candidate c = new Candidate();
+                    c.setThemeId(themeId);
+                    c.setName(name.trim());
+                    c.setDepartmentId(deptMap.get(deptName).getId());
+                    if (sortStr != null && !sortStr.isBlank()) {
+                        try {
+                            c.setSort(Integer.parseInt(sortStr.trim()));
+                        } catch (NumberFormatException ignore) {
+                            // 排序非数字时忽略
+                        }
+                    }
+                    if (catName != null && !catName.isBlank()) {
+                        ThemeCategory cat = catMap.get(catName);
+                        if (cat == null) {
+                            throw new BizException("分类不存在: " + catName);
+                        }
+                        c.setCategoryId(cat.getId());
+                    }
+                    // 自定义字段
+                    Map<String, Object> extraMap = new LinkedHashMap<>();
+                    for (ThemeCustomField f : fields) {
+                        String val = getCell(row, colIdx++);
+                        extraMap.put(f.getFieldLabel(), val == null ? "" : val);
+                    }
+                    if (!extraMap.isEmpty()) {
+                        c.setExtra(objectMapper.writeValueAsString(extraMap));
+                    }
+                    // 排序: 优先用 Excel 排序列, 未填则按导入顺序
+                    if (c.getSort() == null) {
+                        c.setSort(success);
+                    }
+                    c.setIsWinner(false);
+                    c.setRank(null);
+                    c.setVotes(0);
+                    candidateMapper.insert(c);
+                    success++;
+                } catch (Exception e) {
+                    errors.add("第 " + (r + 1) + " 行: " + e.getMessage());
+                }
+            }
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", success);
+        result.put("errors", errors);
+        return result;
+    }
+
+    private String getCell(Row row, int idx) {
+        Cell cell = row.getCell(idx);
+        if (cell == null) return null;
+        switch (cell.getCellType()) {
+            case STRING: return cell.getStringCellValue();
+            case NUMERIC: return String.valueOf((long) cell.getNumericCellValue());
+            default: return null;
+        }
+    }
+}
