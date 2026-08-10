@@ -46,6 +46,14 @@ public class DepartmentService {
         departmentMapper.deleteById(id);
     }
 
+    /** 批量删除部门 */
+    public void batchDelete(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        departmentMapper.deleteBatchIds(ids);
+    }
+
     private void checkName(String name, Long excludeId) {
         if (!StringUtils.hasText(name)) {
             throw new BizException("部门名称不能为空");

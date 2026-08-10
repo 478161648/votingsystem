@@ -51,6 +51,14 @@ public class CandidateController {
         return Result.ok();
     }
 
+    /** 批量删除候选人 */
+    @PostMapping("/batch-delete")
+    public Result<Void> batchDelete(@PathVariable Long themeId, @RequestBody List<Long> ids) {
+        requireAdmin();
+        themeService.batchDeleteCandidates(themeId, ids);
+        return Result.ok();
+    }
+
     /** 导出模板 */
     @GetMapping("/template")
     public void exportTemplate(@PathVariable Long themeId, HttpServletResponse response) throws Exception {

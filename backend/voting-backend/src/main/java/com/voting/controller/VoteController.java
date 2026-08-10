@@ -44,11 +44,11 @@ public class VoteController {
     /** 提交选票 */
     @PostMapping("/submit")
     public Result<Void> submit(@RequestBody Map<String, Object> body) {
-        Long themeId = ((Number) body.get("themeId")).longValue();
+         Long themeId = ((Number) body.get("themeId")).longValue();
         @SuppressWarnings("unchecked")
         List<Number> candIds = (List<Number>) body.get("candidateIds");
         List<Long> ids = candIds == null ? List.of() : candIds.stream().map(Number::longValue).toList();
-        voteService.submit(themeId, ids);
+         voteService.submit(themeId, ids);
         return Result.ok();
     }
 }

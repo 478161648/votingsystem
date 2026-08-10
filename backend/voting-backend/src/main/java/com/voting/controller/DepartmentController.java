@@ -43,6 +43,14 @@ public class DepartmentController {
         return Result.ok();
     }
 
+    /** 批量删除部门 */
+    @PostMapping("/batch-delete")
+    public Result<Void> batchDelete(@RequestBody List<Long> ids) {
+        requireAdmin();
+        departmentService.batchDelete(ids);
+        return Result.ok();
+    }
+
     private void requireAdmin() {
         String role = UserContext.getRole();
         if (!"admin".equals(role) && !"super_admin".equals(role)) {

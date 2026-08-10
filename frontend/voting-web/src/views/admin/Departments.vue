@@ -2,11 +2,15 @@
   <el-card shadow="never">
     <div class="card-head">
       <span class="title">部门管理 · 全系统共用一份</span>
-      <div>
+      <div class="head-actions">
+        <el-button v-if="selectedIds.length" size="small" type="danger" plain @click="batchRemove">
+          批量删除 ({{ selectedIds.length }})
+        </el-button>
         <el-button type="primary" size="small" @click="addDept"><el-icon><Plus /></el-icon>新增部门</el-button>
       </div>
     </div>
-    <el-table :data="departments" size="small" border>
+    <el-table :data="departments" size="small" border @selection-change="sel => selectedIds = sel.map(s => s.id)">
+      <el-table-column type="selection" width="42" />
       <el-table-column prop="sort" label="排序" width="70" />
       <el-table-column prop="name" label="部门名称" min-width="200" />
       <el-table-column prop="createTime" label="创建时间" width="180" />
@@ -38,16 +42,18 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { listDepartments, saveDepartment, updateDepartment, deleteDepartment } from '../../api'
+import { listDepartments, saveDepartment, updateDepartment, deleteDepartment, batchDeleteDepartments } from '../../api'
 
 const departments = ref([])
 const dialog = ref(false)
+const selectedIds = ref([])
 const form = reactive({ id: null, name: '', sort: 0 })
 
 onMounted(loadData)
 
 async function loadData() {
   departments.value = await listDepartments()
+  selectedIds.value = []
 }
 
 function addDept() {
@@ -75,9 +81,16 @@ async function removeDept(row) {
   await loadData()
   ElMessage.success('已删除')
 }
+async function batchRemove() {
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个部门?`, '批量删除', { type: 'warning' })
+  await batchDeleteDepartments(selectedIds.value)
+  await loadData()
+  ElMessage.success(`已删除 ${selectedIds.value.length} 个部门`)
+}
 </script>
 
 <style scoped>
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .card-head .title { font-size: 1.05rem; font-weight: 800; }
+.head-actions { display: flex; gap: 8px; }
 </style>

@@ -26,8 +26,8 @@
       </el-col>
 
       <!-- 右侧: 主题配置 -->
-      <el-col :span="17">
-        <el-card v-if="currentTheme" shadow="never">
+      <el-col :span="17" class="right-col">
+        <el-card v-if="currentTheme" shadow="never" class="right-card">
           <div class="card-head">
             <span class="title">主题配置 · {{ currentTheme.name }}</span>
             <div>
@@ -36,7 +36,7 @@
             </div>
           </div>
 
-          <el-tabs v-model="activeTab">
+          <el-tabs v-model="activeTab" class="theme-tabs">
             <!-- 基本信息 -->
             <el-tab-pane label="基本信息" name="basic">
               <el-form label-width="110px" class="basic-form">
@@ -135,7 +135,7 @@
             </el-tab-pane>
 
             <!-- 候选项管理 -->
-            <el-tab-pane label="候选项管理" name="cands">
+            <el-tab-pane label="候选项管理" name="cands" class="cand-pane">
               <div class="pane-head">
                 <span class="tip">固定属性: 名称 + 所属部门; 其余按自定义字段填写 (共 {{ currentTheme.customFields.length }} 个字段)</span>
                 <div>
@@ -149,13 +149,18 @@
                       <el-icon><Upload /></el-icon>导入
                     </el-button>
                   </el-upload>
+                  <el-button v-if="selectedCandIds.length" size="small" type="danger" plain @click="batchRemoveCandidates">
+                    批量删除 ({{ selectedCandIds.length }})
+                  </el-button>
                   <el-button size="small" type="primary" @click="addCandidate">
                     <el-icon><Plus /></el-icon>新增候选
                   </el-button>
                 </div>
               </div>
 
-              <el-table :data="candidates" size="small" border class="cand-table" max-height="460">
+              <el-table :data="candidates" size="small" border class="cand-table" height="100%"
+                        @selection-change="sel => selectedCandIds = sel.map(s => s.id)">
+                <el-table-column type="selection" width="40" fixed="left" />
                 <el-table-column prop="sort" label="排序" width="60" fixed="left" />
                 <el-table-column label="分类" width="100">
                   <template #default="{ row }">{{ row.categoryName || '—' }}</template>
@@ -215,17 +220,20 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listThemes, getTheme, saveTheme, deleteTheme,
-  listDepartments, listCandidates, saveCandidate, deleteCandidate
+  listDepartments, listCandidates, saveCandidate, deleteCandidate, batchDeleteCandidates
 } from '../../api'
+import { wsClient } from '../../utils/ws'
 
 const themes = ref([])
 const currentTheme = ref(null)
 const departments = ref([])
 const candidates = ref([])
+const selectedCandIds = ref([])
+const wsUnsub = ref(null)
 const activeTab = ref('basic')
 const candDialog = ref(false)
 const candForm = reactive({ id: null, name: '', departmentId: null, categoryId: null, extraMap: {} })
@@ -246,7 +254,32 @@ const statusTag = s => STATUS[s]?.tag || 'info'
 
 onMounted(async () => {
   await loadAll()
+  // 订阅 WS 主题更新: 归档自动生成良好主题/其他控场动作后, 自动刷新主题列表, 无需手动刷新页面
+  wsUnsub.value = wsClient.subscribe(msg => {
+    if (msg.type === 'themeUpdate') {
+      refreshThemes()
+    }
+  })
 })
+
+onUnmounted(() => { if (wsUnsub.value) wsUnsub.value() })
+
+/** 刷新主题列表(保留当前选中主题); 若当前主题已被删除则回到第一个 */
+async function refreshThemes() {
+  const cur = currentTheme.value?.id
+  themes.value = await listThemes()
+  if (cur && themes.value.some(t => t.id === cur)) {
+    currentTheme.value = themes.value.find(t => t.id === cur)
+    if (currentTheme.value.candidateCount !== undefined) {
+      loadCandidates()
+    }
+  } else if (themes.value.length) {
+    selectTheme(themes.value[0])
+  } else {
+    currentTheme.value = null
+    candidates.value = []
+  }
+}
 
 async function loadAll() {
   themes.value = await listThemes()
@@ -310,6 +343,7 @@ function removeField(i) { currentTheme.value.customFields.splice(i, 1) }
 async function loadCandidates() {
   if (!currentTheme.value) return
   candidates.value = await listCandidates(currentTheme.value.id)
+  selectedCandIds.value = []
 }
 
 function addCandidate() {
@@ -353,6 +387,15 @@ async function removeCandidate(row) {
   ElMessage.success('已删除')
 }
 
+async function batchRemoveCandidates() {
+  await ElMessageBox.confirm(
+    `确定删除选中的 ${selectedCandIds.value.length} 个候选人? 已产生的投票记录将一并清理关联`, '批量删除', { type: 'warning' }
+  )
+  await batchDeleteCandidates(currentTheme.value.id, selectedCandIds.value)
+  await loadCandidates()
+  ElMessage.success(`已删除 ${selectedCandIds.value.length} 个候选人`)
+}
+
 function exportTemplate() {
   const token = localStorage.getItem('voting_token')
   const url = `/api/theme/${currentTheme.value.id}/candidate/template`
@@ -393,8 +436,30 @@ async function importFile({ file }) {
 </script>
 
 <style scoped>
+/* 页面整体撑满, 右栏卡片/表格拉到页面底部 */
+.theme-edit { height: calc(100vh - 96px); }
+.theme-edit :deep(.el-row) { height: 100%; }
+.theme-edit :deep(.el-col) { height: 100%; }
+.right-col { display: flex; }
+.right-col > .el-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.right-col :deep(.el-card__body) {
+  flex: 1; display: flex; flex-direction: column; min-height: 0;
+}
+.theme-tabs {
+  flex: 1; display: flex; flex-direction: column; min-height: 0;
+}
+.theme-tabs :deep(.el-tabs__content) {
+  flex: 1; min-height: 0; overflow: auto;
+}
+.theme-tabs :deep(.el-tab-pane) {
+  height: 100%; display: flex; flex-direction: column;
+}
+.theme-tabs :deep(.cand-pane) { min-height: 0; }
+.cand-table { flex: 1; min-height: 0; }
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .card-head .title { font-size: 1.05rem; font-weight: 800; }
+.list-card { height: 100%; overflow: auto; }
+.list-card :deep(.el-card__body) { display: flex; flex-direction: column; }
 .theme-item {
   padding: 12px 14px; border: 1.5px solid #e6eaf2; border-radius: 10px;
   margin-bottom: 8px; cursor: pointer; transition: all .15s; background: #fff;

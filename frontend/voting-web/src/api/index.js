@@ -8,6 +8,7 @@ export const listDepartments = () => request.get('/department/list')
 export const saveDepartment = data => request.post('/department/save', data)
 export const updateDepartment = data => request.put('/department/update', data)
 export const deleteDepartment = id => request.delete(`/department/${id}`)
+export const batchDeleteDepartments = ids => request.post('/department/batch-delete', ids)
 
 // 用户
 export const listUsers = () => request.get('/user/list')
@@ -26,6 +27,7 @@ export const deleteTheme = id => request.delete(`/theme/${id}`)
 export const listCandidates = themeId => request.get(`/theme/${themeId}/candidate/list`)
 export const saveCandidate = (themeId, data) => request.post(`/theme/${themeId}/candidate/save`, data)
 export const deleteCandidate = (themeId, id) => request.delete(`/theme/${themeId}/candidate/${id}`)
+export const batchDeleteCandidates = (themeId, ids) => request.post(`/theme/${themeId}/candidate/batch-delete`, ids)
 
 // 控场
 export const controlStart = themeId => request.post(`/control/${themeId}/start`)

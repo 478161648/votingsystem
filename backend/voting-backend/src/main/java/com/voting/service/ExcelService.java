@@ -90,19 +90,24 @@ public class ExcelService {
             for (ThemeCustomField f : fields) {
                 demo.createCell(demoCol++).setCellValue("示例值");
             }
-            // 所属部门下拉 (数据校验)
+            // 所属部门下拉 (隐藏Sheet引用, 支持任意数量部门; 不用内联公式列表因255字符限制)
             if (!depts.isEmpty()) {
-                DataValidationHelper helper = sheet.getDataValidationHelper();
-                String formula = "\"" + depts.stream().map(Department::getName)
-                        .reduce((a, b) -> a + "," + b).orElse("") + "\"";
-                if (formula.length() < 255) {
-                    DataValidationConstraint constraint = helper.createFormulaListConstraint(formula);
-                    // 所属部门列: 有分类时在 index 2, 无分类时在 index 1
-                    int deptCol = cats.isEmpty() ? 1 : 2;
-                    CellRangeAddressList range = new CellRangeAddressList(1, 1000, deptCol, deptCol);
-                    DataValidation validation = helper.createValidation(constraint, range);
-                    sheet.addValidationData(validation);
+                Sheet deptSheet = wb.createSheet("部门列表");
+                for (int i = 0; i < depts.size(); i++) {
+                    deptSheet.createRow(i).createCell(0).setCellValue(depts.get(i).getName());
                 }
+                wb.setSheetHidden(wb.getSheetIndex(deptSheet), true);
+
+                DataValidationHelper helper = sheet.getDataValidationHelper();
+                // 引用隐藏Sheet的部门名区域(中文Sheet名需单引号包裹)
+                DataValidationConstraint constraint =
+                        helper.createFormulaListConstraint("'部门列表'!$A$1:$A$" + depts.size());
+                // 所属部门列: 有分类时在 index 2, 无分类时在 index 1
+                int deptCol = cats.isEmpty() ? 1 : 2;
+                CellRangeAddressList range = new CellRangeAddressList(1, 1000, deptCol, deptCol);
+                DataValidation validation = helper.createValidation(constraint, range);
+                validation.setShowErrorBox(true);
+                sheet.addValidationData(validation);
             }
             wb.write(out);
         }

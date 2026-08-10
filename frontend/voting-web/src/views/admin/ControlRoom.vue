@@ -192,15 +192,29 @@ onMounted(async () => {
     themeId.value = themes.value[0].id
     await loadAll()
   }
-  // 订阅 WS 主题更新
+  // 订阅 WS 主题更新: 归档生成良好主题等动作发生后, 自动刷新主题下拉列表, 无需手动刷新页面
   unsub = wsClient.subscribe(msg => {
     if (msg.type === 'themeUpdate') {
-      loadAll()
+      refreshThemes()
     }
   })
 })
 
 onUnmounted(() => { if (unsub) unsub() })
+
+/** 刷新主题列表 + 当前主题数据; 当前主题被删/归档后自动切到第一个可操作主题 */
+async function refreshThemes() {
+  themes.value = await listThemes()
+  if (!themeId.value || !themes.value.some(t => t.id === themeId.value)) {
+    if (themes.value.length) {
+      themeId.value = themes.value[0].id
+    } else {
+      theme.value = null
+      return
+    }
+  }
+  await loadAll()
+}
 
 async function loadAll() {
   if (!themeId.value) return

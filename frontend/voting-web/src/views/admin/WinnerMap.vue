@@ -1,10 +1,10 @@
 <template>
-  <el-card shadow="never">
+  <el-card shadow="never" class="map-card">
     <div class="card-head">
       <span class="title">获奖地图 · 部门 × 主题交叉表</span>
       <el-button size="small" @click="loadData">刷新</el-button>
     </div>
-    <el-table :data="rows" size="small" border class="map-table" max-height="600">
+    <el-table :data="rows" size="small" border class="map-table" height="100%">
       <el-table-column prop="name" label="部门" width="150" fixed="left">
         <template #default="{ row }">
           <b :class="{ 'zero-row': row.sum === 0 && row.name !== '合计' }">{{ row.name }}</b>
@@ -50,8 +50,21 @@ async function loadData() {
 </script>
 
 <style scoped>
+/* 撑满页面底部: 卡片占满 main 剩余高度, 表格 flex 填满 */
+.map-card {
+  height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+}
+.map-card :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .card-head .title { font-size: 1.05rem; font-weight: 800; }
+.map-table { flex: 1; min-height: 0; }
 .map-table :deep(.el-table__cell) { padding: 4px 6px; }
 .check { color: #1a9c55; font-weight: 800; font-size: 1rem; }
 .dash { color: #c9d0dc; }

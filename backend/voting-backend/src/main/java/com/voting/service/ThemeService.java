@@ -28,15 +28,17 @@ public class ThemeService {
     private final ThemeCustomFieldMapper fieldMapper;
     private final CandidateMapper candidateMapper;
     private final DepartmentMapper departmentMapper;
+    private final BallotItemMapper ballotItemMapper;
 
     public ThemeService(VoteThemeMapper themeMapper, ThemeCategoryMapper categoryMapper,
                         ThemeCustomFieldMapper fieldMapper, CandidateMapper candidateMapper,
-                        DepartmentMapper departmentMapper) {
+                        DepartmentMapper departmentMapper, BallotItemMapper ballotItemMapper) {
         this.themeMapper = themeMapper;
         this.categoryMapper = categoryMapper;
         this.fieldMapper = fieldMapper;
         this.candidateMapper = candidateMapper;
         this.departmentMapper = departmentMapper;
+        this.ballotItemMapper = ballotItemMapper;
     }
 
     // ============ 主题 ============
@@ -246,6 +248,25 @@ public class ThemeService {
     @Transactional
     public void deleteCandidate(Long id) {
         candidateMapper.deleteById(id);
+    }
+
+    /** 批量删除候选人(仅配置态安全: 删除候选同时清理选票明细关联, 不影响已存选票统计) */
+    @Transactional
+    public void batchDeleteCandidates(Long themeId, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        // 仅允许删除本主题下的候选
+        List<Candidate> cands = candidateMapper.selectBatchIds(ids);
+        for (Candidate c : cands) {
+            if (!themeId.equals(c.getThemeId())) {
+                throw new BizException("存在不属于本主题的候选人: " + c.getId());
+            }
+        }
+        candidateMapper.deleteBatchIds(ids);
+        // 清理选票明细中对该候选的引用, 避免残留脏数据
+        ballotItemMapper.delete(
+                new LambdaQueryWrapper<BallotItem>().in(BallotItem::getCandidateId, ids));
     }
 
     @Transactional

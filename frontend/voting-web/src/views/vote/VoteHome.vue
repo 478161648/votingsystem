@@ -170,6 +170,8 @@ const fields = ref([])
 const selected = ref(new Set())
 const voted = ref(false)
 const phase = ref('OPEN')
+/** 上一次阶段(用于检测"刚进入重投轮"以清空上一轮勾选) */
+const lastPhase = ref('')
 const winners = ref([])
 const vacancy = ref(0)
 const revoteTieIds = ref([])
@@ -291,6 +293,7 @@ onUnmounted(() => { if (unsub) unsub() })
 
 watch(themeId, () => {
   selected.value = new Set() // 切换主题时清空旧选择
+  lastPhase.value = ''       // 重置阶段记录, 使进入重投轮时能正确清空
   loadTheme()
 })
 
@@ -321,10 +324,15 @@ async function loadTheme() {
     : theme.value.status === 'OPEN' ? 'OPEN'
     : theme.value.status === 'TIE_REVOTE' ? 'REVOTE'
     : theme.value.status === 'ARCHIVED' ? 'ARCHIVED' : 'TALLIED'
-  // 已投票后保留已选(只读展示我投了谁), 未投票/换主题才清空
-  if (!voted.value || !selected.value.size) {
+  // selected 清理策略:
+  // - 切换主题: watch(themeId) 清空
+  // - 刚进入平票重投轮(上一阶段非 REVOTE): 清空上一轮残留勾选(如第一轮投的 A、C), 否则重投会被误判为已选超限
+  // - 刚回到 DRAFT(清除数据): 清空勾选, 数据已清零从零开始
+  // - 同阶段内 WS 刷新(仍 REVOTE / 仍 OPEN / 仍 DRAFT): 保留用户勾选, 避免投票前勾选被意外清掉导致空票提交
+  if ((phase.value === 'REVOTE' || phase.value === 'DRAFT') && lastPhase.value !== phase.value) {
     selected.value = new Set()
   }
+  lastPhase.value = phase.value
 
   if (phase.value === 'REVOTE') {
     try {
