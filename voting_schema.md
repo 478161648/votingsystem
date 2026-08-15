@@ -1,6 +1,6 @@
 # 年度投票系统 · 数据库表结构说明（voting 库）
 
-> 生成时间：2026-08-09　|　数据库：`voting`（MySQL 8+）　|　共 9 张表
+> 生成时间：2026-08-15　|　数据库：`voting`（MySQL 8+）　|　共 9 张表
 > 完整 SQL 见同目录 [`voting_schema.sql`](./voting_schema.sql)（mysqldump 导出，不含数据）
 
 ## 表清单
@@ -130,7 +130,8 @@
 | `id` | bigint | 否 | NULL |  |
 | `theme_id` | bigint | 否 | NULL | 主题id |
 | `name` | varchar(100) | 否 | NULL | 分类名 |
-| `quota` | int | 否 | 1 | 该分类名额 |
+| `quota` | int | 否 | 1 | 该分类优秀名额 |
+| `good_quota` | int | 是 | NULL | 该分类良好名额(null=默认同优秀名额) |
 | `sort` | int | 否 | 0 | 排序 |
 
 **索引：**
