@@ -25,4 +25,13 @@ public interface BallotMapper extends BaseMapper<Ballot> {
             "WHERE (#{themeId} IS NULL OR b.theme_id = #{themeId}) " +
             "ORDER BY b.vote_time DESC")
     List<Map<String, Object>> auditBallots(@Param("themeId") Long themeId);
+
+    /** 某主题所有轮次中每个候选的得票数: candidateId, round, cnt */
+    @Select("SELECT bi.candidate_id AS candidateId, b.round AS round, COUNT(*) AS cnt " +
+            "FROM ballot_item bi " +
+            "JOIN ballot b ON bi.ballot_id = b.id " +
+            "WHERE b.theme_id = #{themeId} " +
+            "GROUP BY bi.candidate_id, b.round " +
+            "ORDER BY b.round, bi.candidate_id")
+    List<Map<String, Object>> countVotesByAllRounds(@Param("themeId") Long themeId);
 }

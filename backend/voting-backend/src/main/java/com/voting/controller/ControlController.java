@@ -1,14 +1,22 @@
 package com.voting.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.voting.common.BizException;
 import com.voting.common.Result;
 import com.voting.dto.TallyResult;
 import com.voting.entity.OperationLog;
 import com.voting.entity.VoteTheme;
+import com.voting.mapper.VoteThemeMapper;
 import com.voting.service.ControlService;
+import com.voting.service.ExcelService;
 import com.voting.util.UserContext;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletResponse;
+import java.io.OutputStream;
+import java.net.URLEncoder;
 import java.util.List;
 import java.util.Map;
 
@@ -20,9 +28,14 @@ import java.util.Map;
 public class ControlController {
 
     private final ControlService controlService;
+    private final ExcelService excelService;
+    private final VoteThemeMapper themeMapper;
 
-    public ControlController(ControlService controlService) {
+    public ControlController(ControlService controlService, ExcelService excelService,
+                             VoteThemeMapper themeMapper) {
         this.controlService = controlService;
+        this.excelService = excelService;
+        this.themeMapper = themeMapper;
     }
 
     @PostMapping("/{themeId}/start")
@@ -81,6 +94,22 @@ public class ControlController {
     public Result<List<OperationLog>> logs(@PathVariable Long themeId) {
         requireAdmin();
         return Result.ok(controlService.logs(themeId));
+    }
+
+    /** 导出得票统计 Excel: 每轮每候选得票(归档后使用) */
+    @GetMapping("/{themeId}/export-stats")
+    public void exportStats(@PathVariable Long themeId, HttpServletResponse response) throws Exception {
+        requireAdmin();
+        VoteTheme theme = themeMapper.selectById(themeId);
+        if (theme == null) {
+            throw new BizException("主题不存在");
+        }
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=" + URLEncoder.encode(theme.getName() + "-得票统计.xlsx", "UTF-8"));
+        try (OutputStream out = response.getOutputStream()) {
+            excelService.exportVoteStats(themeId, out);
+        }
     }
 
     private void requireAdmin() {

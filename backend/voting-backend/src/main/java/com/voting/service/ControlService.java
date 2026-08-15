@@ -62,15 +62,11 @@ public class ControlService {
         if (!"DRAFT".equals(theme.getStatus())) {
             throw new BizException("仅 DRAFT 状态可开始投票");
         }
-        // 良好级主题: 所有已启用良好级的优秀主题必须已归档
+        // 良好级主题: 仅校验其对应的优秀级主题(父主题)已归档, 不约束其他优秀主题
         if (theme.getParentThemeId() != null) {
-            Long unfinishedGood = themeMapper.selectCount(
-                    new LambdaQueryWrapper<VoteTheme>()
-                            .eq(VoteTheme::getHasGood, true)
-                            .ne(VoteTheme::getStatus, "ARCHIVED")
-                            .isNull(VoteTheme::getParentThemeId));
-            if (unfinishedGood > 0) {
-                throw new BizException("存在尚未归档的优秀级主题, 请先完成优秀级评选");
+            VoteTheme parent = themeMapper.selectById(theme.getParentThemeId());
+            if (parent == null || !"ARCHIVED".equals(parent.getStatus())) {
+                throw new BizException("对应优秀级主题「" + (parent == null ? "" : parent.getName()) + "」尚未归档, 请先完成其优秀级评选");
             }
         }
         theme.setStatus("OPEN");

@@ -23,6 +23,9 @@
           <el-button type="success" :disabled="!btnEnabled('tally')" @click="act('tally')">统计结果</el-button>
           <el-button type="warning" :disabled="!btnEnabled('revote')" @click="act('revote')">平票重投</el-button>
           <el-button type="danger" plain :disabled="!btnEnabled('end')" @click="act('end')">结束归档</el-button>
+          <el-button :disabled="!canExportStats" @click="exportStats">
+            <el-icon><Download /></el-icon>导出统计
+          </el-button>
           <el-button type="danger" @click="clearData">
             <el-icon><Delete /></el-icon>清除数据
           </el-button>
@@ -151,6 +154,9 @@ const statusText = s => STATUS[s]?.text || s
 const statusTag = s => STATUS[s]?.tag || 'info'
 
 const isSecret = computed(() => theme.value && (theme.value.status === 'OPEN' || theme.value.status === 'TIE_REVOTE'))
+
+/** 得票统计导出: 仅已统计(TALLIED)或已归档(ARCHIVED)可用 */
+const canExportStats = computed(() => theme.value && ['TALLIED', 'ARCHIVED'].includes(theme.value.status))
 
 const cn = ['一', '二', '三', '四', '五', '六', '七', '八']
 
@@ -295,6 +301,31 @@ async function revokeUser(userId) {
 function openScreen() {
   const url = `/screen/${themeId.value}`
   window.open(url, '_blank', 'width=1400,height=900')
+}
+
+/** 导出得票统计 Excel (每轮每候选得票) */
+function exportStats() {
+  const token = localStorage.getItem('voting_token')
+  const url = `/api/control/${themeId.value}/export-stats`
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', url, true)
+  xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+  xhr.responseType = 'blob'
+  xhr.onload = () => {
+    if (xhr.status !== 200) {
+      ElMessage.error('导出失败')
+      return
+    }
+    const blob = xhr.response
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `${theme.value?.name || '主题'}-得票统计.xlsx`
+    a.click()
+    URL.revokeObjectURL(a.href)
+    ElMessage.success('已导出')
+  }
+  xhr.onerror = () => ElMessage.error('导出失败')
+  xhr.send()
 }
 
 const ACTION_TEXT = {
