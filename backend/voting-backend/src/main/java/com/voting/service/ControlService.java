@@ -280,18 +280,28 @@ public class ControlService {
         goodTheme.setCurrentRound(1);
         themeMapper.insert(goodTheme);
 
-        // 复制分类
+        // 复制分类: 良好分类名额 = 优秀分类的良好名额(null 时默认=优秀名额)
         List<ThemeCategory> cats = categoryMapper.selectList(
                 new LambdaQueryWrapper<ThemeCategory>().eq(ThemeCategory::getThemeId, excellentTheme.getId()));
         Map<Long, Long> catIdMap = new HashMap<>();
+        int sumGood = 0;
         for (ThemeCategory c : cats) {
             ThemeCategory nc = new ThemeCategory();
             nc.setThemeId(goodTheme.getId());
             nc.setName(c.getName());
-            nc.setQuota(c.getQuota());
+            int goodQuota = c.getGoodQuota() == null ? (c.getQuota() == null ? 0 : c.getQuota()) : c.getGoodQuota();
+            nc.setQuota(goodQuota);
+            nc.setGoodQuota(null);
             nc.setSort(c.getSort());
             categoryMapper.insert(nc);
+            sumGood += goodQuota;
             catIdMap.put(c.getId(), nc.getId());
+        }
+        // 有分类时: 良好主题总名额 = Σ分类良好名额(覆盖上面按主题级 goodQuota 的初值)
+        if (!cats.isEmpty()) {
+            themeMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<VoteTheme>()
+                    .eq(VoteTheme::getId, goodTheme.getId())
+                    .set(VoteTheme::getTotalQuota, sumGood));
         }
         // 复制自定义字段
         List<ThemeCustomField> fields = fieldMapper.selectList(

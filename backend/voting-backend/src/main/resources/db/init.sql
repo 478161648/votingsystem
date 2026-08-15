@@ -62,7 +62,8 @@ CREATE TABLE theme_category (
   id       BIGINT       NOT NULL AUTO_INCREMENT,
   theme_id BIGINT       NOT NULL COMMENT '主题id',
   name     VARCHAR(100) NOT NULL COMMENT '分类名',
-  quota    INT          NOT NULL DEFAULT 1 COMMENT '该分类名额',
+  quota    INT          NOT NULL DEFAULT 1 COMMENT '该分类优秀名额',
+  good_quota INT       DEFAULT NULL COMMENT '该分类良好名额(null=默认同优秀名额)',
   sort     INT          NOT NULL DEFAULT 0 COMMENT '排序',
   PRIMARY KEY (id),
   KEY idx_category_theme (theme_id)

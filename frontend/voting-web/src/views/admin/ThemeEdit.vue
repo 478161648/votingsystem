@@ -51,9 +51,9 @@
                   <el-switch v-model="currentTheme.hasGood" />
                   <span class="tip">归档后自动生成「良好」主题 (候选=优秀候选-当选者)</span>
                 </el-form-item>
-                <el-form-item v-if="currentTheme.hasGood" label="良好名额">
+                <el-form-item v-if="currentTheme.hasGood && !currentTheme.categories?.length" label="良好名额">
                   <el-input-number v-model="currentTheme.goodQuota" :min="0" :max="99" />
-                  <span class="tip">默认 = 优秀名额, 可单独调整</span>
+                  <span class="tip">默认 = 优秀名额, 可单独调整; 有分类时请在「分类配置」按类分别设置良好名额</span>
                 </el-form-item>
                 <el-form-item label="状态">
                   <el-tag :type="statusTag(currentTheme.status)">{{ statusText(currentTheme.status) }}</el-tag>
@@ -67,7 +67,7 @@
             <!-- 分类配置 -->
             <el-tab-pane label="分类配置" name="cats">
               <div class="pane-head">
-                <span class="tip">分类为可选: 每类自定义名称 + 名额 (总名额 = Σ分类名额)</span>
+                <span class="tip">分类为可选: 每类自定义「优秀名额 + 良好名额」(良好名额 = 归档后自动生成的「良好」主题的该类名额)</span>
                 <el-button size="small" type="primary" @click="addCat">
                   <el-icon><Plus /></el-icon>添加分类
                 </el-button>
@@ -79,9 +79,14 @@
                     <el-input v-model="row.name" placeholder="如: 业务部门" />
                   </template>
                 </el-table-column>
-                <el-table-column label="名额" width="160">
+                <el-table-column label="优秀名额" width="120">
                   <template #default="{ row }">
                     <el-input-number v-model="row.quota" :min="0" :max="99" size="small" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="良好名额" width="120">
+                  <template #default="{ row }">
+                    <el-input-number v-model="row.goodQuota" :min="0" :max="99" size="small" />
                   </template>
                 </el-table-column>
                 <el-table-column label="操作" width="90">
@@ -91,7 +96,8 @@
                 </el-table-column>
               </el-table>
               <div class="quota-sum" v-if="currentTheme.categories.length">
-                当前分类总名额: <b>{{ catTotalQuota }}</b>
+                优秀总名额: <b>{{ catTotalQuota }}</b>
+                &nbsp;&nbsp;良好总名额: <b>{{ catTotalGoodQuota }}</b>
               </div>
             </el-tab-pane>
 
@@ -241,6 +247,10 @@ const candForm = reactive({ id: null, name: '', departmentId: null, categoryId: 
 const catTotalQuota = computed(() =>
   (currentTheme.value?.categories || []).reduce((s, c) => s + (c.quota || 0), 0)
 )
+/** 分类良好总名额 (goodQuota 为空时按优秀名额计) */
+const catTotalGoodQuota = computed(() =>
+  (currentTheme.value?.categories || []).reduce((s, c) => s + (c.goodQuota ?? c.quota ?? 0), 0)
+)
 
 const STATUS = {
   DRAFT: { text: '未开始', tag: 'info' },
@@ -309,10 +319,13 @@ async function addTheme() {
 }
 
 async function saveThemeConfig() {
+  // 有分类时: 良好名额 = Σ分类良好名额; 无分类时用主题级输入值
+  const hasCats = (currentTheme.value.categories || []).length > 0
+  const goodQuota = hasCats ? catTotalGoodQuota.value : currentTheme.value.goodQuota
   const payload = {
     ...currentTheme.value,
-    totalQuota: currentTheme.value.categories?.length ? catTotalQuota.value : currentTheme.value.totalQuota,
-    goodQuota: currentTheme.value.goodQuota
+    totalQuota: hasCats ? catTotalQuota.value : currentTheme.value.totalQuota,
+    goodQuota
   }
   await saveTheme(payload)
   await loadAll()
@@ -330,7 +343,7 @@ async function removeTheme() {
 
 function addCat() {
   if (!currentTheme.value.categories) currentTheme.value.categories = []
-  currentTheme.value.categories.push({ name: '', quota: 1, sort: currentTheme.value.categories.length })
+  currentTheme.value.categories.push({ name: '', quota: 1, goodQuota: 1, sort: currentTheme.value.categories.length })
 }
 function removeCat(i) { currentTheme.value.categories.splice(i, 1) }
 

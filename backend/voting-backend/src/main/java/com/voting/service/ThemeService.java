@@ -62,10 +62,17 @@ public class ThemeService {
     }
 
     public void fillThemeExt(VoteTheme t) {
-        t.setCategories(categoryMapper.selectList(
+        List<ThemeCategory> cats = categoryMapper.selectList(
                 new LambdaQueryWrapper<ThemeCategory>()
                         .eq(ThemeCategory::getThemeId, t.getId())
-                        .orderByAsc(ThemeCategory::getSort)));
+                        .orderByAsc(ThemeCategory::getSort));
+        // 分类良好名额 null 时默认 = 优秀名额, 统一返回给前端
+        for (ThemeCategory c : cats) {
+            if (c.getGoodQuota() == null) {
+                c.setGoodQuota(c.getQuota());
+            }
+        }
+        t.setCategories(cats);
         t.setCustomFields(fieldMapper.selectList(
                 new LambdaQueryWrapper<ThemeCustomField>()
                         .eq(ThemeCustomField::getThemeId, t.getId())
@@ -128,6 +135,10 @@ public class ThemeService {
             for (ThemeCategory c : theme.getCategories()) {
                 if (!StringUtils.hasText(c.getName())) continue;
                 String name = c.getName().trim();
+                // 分类良好名额: null 时默认 = 优秀名额
+                if (c.getGoodQuota() == null) {
+                    c.setGoodQuota(c.getQuota());
+                }
                 if (c.getId() != null && oldNameById.containsKey(c.getId())) {
                     // 已有分类: 保留 id 更新 (候选 categoryId 继续有效)
                     c.setThemeId(theme.getId());
@@ -161,6 +172,22 @@ public class ThemeService {
                     }
                 }
             }
+        }
+        // 有分类时: 主题级 总名额=Σ分类优秀名额, 良好名额=Σ分类良好名额(保持主题级冗余字段一致)
+        if (theme.getCategories() != null && !theme.getCategories().isEmpty()) {
+            List<ThemeCategory> savedCats = categoryMapper.selectList(
+                    new LambdaQueryWrapper<ThemeCategory>().eq(ThemeCategory::getThemeId, theme.getId()));
+            int sumQuota = 0, sumGood = 0;
+            for (ThemeCategory c : savedCats) {
+                sumQuota += c.getQuota() == null ? 0 : c.getQuota();
+                sumGood += c.getGoodQuota() == null ? (c.getQuota() == null ? 0 : c.getQuota()) : c.getGoodQuota();
+            }
+            themeMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<VoteTheme>()
+                    .eq(VoteTheme::getId, theme.getId())
+                    .set(VoteTheme::getTotalQuota, sumQuota)
+                    .set(VoteTheme::getGoodQuota, sumGood));
+            theme.setTotalQuota(sumQuota);
+            theme.setGoodQuota(sumGood);
         }
         // 保存自定义字段
         if (theme.getCustomFields() != null) {

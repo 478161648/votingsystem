@@ -12,7 +12,9 @@ public class ThemeCategory {
     private Long id;
     private Long themeId;
     private String name;
-    /** 该分类名额 */
+    /** 该分类优秀名额 */
     private Integer quota;
+    /** 该分类良好名额; null 时默认 = quota */
+    private Integer goodQuota;
     private Integer sort;
 }
