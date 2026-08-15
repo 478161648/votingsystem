@@ -10,6 +10,9 @@
               <el-tag size="small" :type="statusTag(t.status)" style="margin-left:8px">{{ statusText(t.status) }}</el-tag>
             </el-option>
           </el-select>
+          <el-button size="small" :loading="refreshing" @click="refreshPage" style="margin-left:8px">
+            <el-icon><Refresh /></el-icon>刷新
+          </el-button>
         </div>
         <div class="status" v-if="theme">
           <el-tag size="large" :type="statusTag(theme.status)">{{ statusText(theme.status) }}</el-tag>
@@ -134,6 +137,7 @@ const theme = ref(null)
 const ranking = ref([])
 const participation = ref([])
 const logs = ref([])
+const refreshing = ref(false)
 let unsub = null
 
 const STATUS = {
@@ -214,6 +218,28 @@ async function refreshThemes() {
     }
   }
   await loadAll()
+}
+
+/** 手动刷新: 强制拉取最新状态(主题列表+当前主题排名/参与/日志), 保持当前主题不变 */
+async function refreshPage() {
+  refreshing.value = true
+  try {
+    const curId = themeId.value
+    themes.value = await listThemes()
+    // 当前主题仍存在则保持; 若被删除则回退第一个
+    if (curId && themes.value.some(t => t.id === curId)) {
+      themeId.value = curId
+    } else if (themes.value.length) {
+      themeId.value = themes.value[0].id
+    } else {
+      theme.value = null
+      return
+    }
+    await loadAll()
+    ElMessage.success('已刷新')
+  } finally {
+    refreshing.value = false
+  }
 }
 
 async function loadAll() {

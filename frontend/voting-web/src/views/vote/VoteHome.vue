@@ -19,6 +19,16 @@
           <el-select v-model="themeId" size="small" @change="loadTheme" style="width: 260px">
             <el-option v-for="t in themes" :key="t.id" :label="t.name + ' · ' + statusText(t.status)" :value="t.id" />
           </el-select>
+          <el-button size="small" :loading="refreshing" @click="refreshPage" style="margin-left:6px">
+            <el-icon><Refresh /></el-icon>刷新
+          </el-button>
+        </div>
+        <div class="theme-switch" v-else>
+          <span>当前主题</span>
+          <span class="only-theme">{{ themes[0]?.name || '—' }}</span>
+          <el-button size="small" :loading="refreshing" @click="refreshPage" style="margin-left:6px">
+            <el-icon><Refresh /></el-icon>刷新
+          </el-button>
         </div>
         <div class="user-chip">
           <span class="dot"></span>
@@ -179,6 +189,7 @@ const revoteTieIds = ref([])
 const catVacancyMap = ref({})
 const onlineCount = ref(0)
 const votedCount = ref(0)
+const refreshing = ref(false)
 let unsub = null
 
 const cn = ['一', '二', '三', '四', '五', '六', '七', '八']
@@ -310,6 +321,29 @@ async function refreshThemes() {
     }
   }
   await loadTheme()
+}
+
+/** 手动刷新: 强制拉取最新状态(主题列表+当前主题详情/参与统计), 保持当前主题不变 */
+async function refreshPage() {
+  refreshing.value = true
+  try {
+    const curId = themeId.value
+    themes.value = await voteThemes()
+    // 当前主题仍存在则保持; 若被删除则回退第一个
+    if (curId && themes.value.some(t => t.id === curId)) {
+      themeId.value = curId
+    } else if (themes.value.length) {
+      themeId.value = themes.value[0].id
+    } else {
+      theme.value = null
+      themeData.value = null
+      return
+    }
+    await loadTheme()
+    ElMessage.success('已刷新')
+  } finally {
+    refreshing.value = false
+  }
 }
 
 async function loadTheme() {
@@ -482,6 +516,7 @@ const statusTag = s => STATUS[s]?.tag || 'info'
   display: flex; align-items: center; justify-content: center; color: #fff;
 }
 .theme-switch { margin-left: 14px; display: flex; align-items: center; gap: 8px; font-size: .85rem; color: #5b6474; font-weight: 600; }
+.only-theme { font-weight: 700; color: #1c2333; }
 .user-chip {
   margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 14px;
   background: #e8effc; border-radius: 999px; font-weight: 800; color: #1d46b8; font-size: .92rem;
