@@ -110,10 +110,18 @@ public class WsSessionManager {
 
     /** 广播 themeUpdate 通知: 关注该主题的客户端(投票端/控场端/大屏)刷新 */
     public void pushThemeUpdate(Long themeId) {
+        pushThemeUpdate(themeId, null);
+    }
+
+    /** 广播 themeUpdate 通知(带动作标记): action 如 start/tally/end 等, 客户端可据此做定向响应 */
+    public void pushThemeUpdate(Long themeId, String action) {
         try {
             Map<String, Object> msg = new HashMap<>();
             msg.put("type", "themeUpdate");
             msg.put("themeId", themeId);
+            if (action != null) {
+                msg.put("action", action);
+            }
             broadcast(objectMapper.writeValueAsString(msg));
         } catch (Exception e) {
             log.warn("推送 themeUpdate 失败: {}", e.getMessage());

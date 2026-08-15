@@ -295,7 +295,14 @@ onMounted(async () => {
   // 订阅 WS: 管理员控场动作(开始/统计/归档/生成良好主题)自动推送到投票端
   unsub = wsClient.subscribe(msg => {
     if (msg.type === 'themeUpdate') {
-      refreshThemes()
+      // 管理员开始投票: 所有投票用户自动切换到对应主题
+      if (msg.action === 'start' && msg.themeId && msg.themeId !== themeId.value) {
+        refreshThemeListOnly(msg.themeId).then(() => {
+          themeId.value = msg.themeId  // watch(themeId) 会清空旧勾选并加载新主题
+        })
+      } else {
+        refreshThemes()
+      }
     }
   })
 })
@@ -321,6 +328,13 @@ async function refreshThemes() {
     }
   }
   await loadTheme()
+}
+
+/** 仅刷新主题下拉列表(不加载当前主题); 用于"开始投票"推送时先补齐列表再自动切换 */
+async function refreshThemeListOnly(targetId) {
+  const list = await voteThemes()
+  if (targetId && !list.some(t => t.id === targetId)) return
+  themes.value = list
 }
 
 /** 手动刷新: 强制拉取最新状态(主题列表+当前主题详情/参与统计), 保持当前主题不变 */

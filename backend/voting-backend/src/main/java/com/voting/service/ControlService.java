@@ -73,7 +73,8 @@ public class ControlService {
         theme.setCurrentRound(1);
         themeMapper.updateById(theme);
         logOperation("START", themeId, "开始投票: " + theme.getName());
-        wsSessionManager.pushThemeUpdate(themeId);
+        // action=start: 投票端收到后自动切换到本主题
+        wsSessionManager.pushThemeUpdate(themeId, "start");
         return getThemeSafe(themeId);
     }
 
