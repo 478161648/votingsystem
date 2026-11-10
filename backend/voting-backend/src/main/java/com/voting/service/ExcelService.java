@@ -95,7 +95,33 @@ public class ExcelService {
             for (ThemeCustomField f : fields) {
                 demo.createCell(demoCol++).setCellValue("示例值");
             }
-            // 所属部门下拉 (隐藏Sheet引用, 支持任意数量部门; 不用内联公式列表因255字符限制)
+            // ---------- 数据校验（下拉）----------
+            // 统一用「隐藏 Sheet + 公式引用」而不是内联列表：
+            //   内联列表 createExplicitListConstraint 有 255 字符上限，
+            //   且分类名/部门名里出现英文逗号时会被当成多个选项解析错
+            // 中文 Sheet 名必须用单引号包裹：'分类列表'!$A$1:$A$3
+
+            // 分类下拉（仅当该主题配了分类才有这一列）
+            if (!cats.isEmpty()) {
+                Sheet catSheet = wb.createSheet("分类列表");
+                for (int i = 0; i < cats.size(); i++) {
+                    catSheet.createRow(i).createCell(0).setCellValue(cats.get(i).getName());
+                }
+                wb.setSheetHidden(wb.getSheetIndex(catSheet), true);
+
+                DataValidationHelper catHelper = sheet.getDataValidationHelper();
+                DataValidationConstraint catConstraint =
+                        catHelper.createFormulaListConstraint("'分类列表'!$A$1:$A$" + cats.size());
+                // 分类列固定在第 2 列（index 1）：只有 cats 非空时才插入这一列
+                CellRangeAddressList catRange = new CellRangeAddressList(1, 1000, 1, 1);
+                DataValidation catValidation = catHelper.createValidation(catConstraint, catRange);
+                catValidation.setShowErrorBox(true);
+                // 允许留空：候选可以不属于任何分类（导入时会按空值处理）
+                catValidation.setEmptyCellAllowed(true);
+                sheet.addValidationData(catValidation);
+            }
+
+            // 所属部门下拉
             if (!depts.isEmpty()) {
                 Sheet deptSheet = wb.createSheet("部门列表");
                 for (int i = 0; i < depts.size(); i++) {
@@ -103,16 +129,16 @@ public class ExcelService {
                 }
                 wb.setSheetHidden(wb.getSheetIndex(deptSheet), true);
 
-                DataValidationHelper helper = sheet.getDataValidationHelper();
-                // 引用隐藏Sheet的部门名区域(中文Sheet名需单引号包裹)
-                DataValidationConstraint constraint =
-                        helper.createFormulaListConstraint("'部门列表'!$A$1:$A$" + depts.size());
+                DataValidationHelper deptHelper = sheet.getDataValidationHelper();
+                DataValidationConstraint deptConstraint =
+                        deptHelper.createFormulaListConstraint("'部门列表'!$A$1:$A$" + depts.size());
                 // 所属部门列: 有分类时在 index 2, 无分类时在 index 1
                 int deptCol = cats.isEmpty() ? 1 : 2;
-                CellRangeAddressList range = new CellRangeAddressList(1, 1000, deptCol, deptCol);
-                DataValidation validation = helper.createValidation(constraint, range);
-                validation.setShowErrorBox(true);
-                sheet.addValidationData(validation);
+                CellRangeAddressList deptRange = new CellRangeAddressList(1, 1000, deptCol, deptCol);
+                DataValidation deptValidation = deptHelper.createValidation(deptConstraint, deptRange);
+                deptValidation.setShowErrorBox(true);
+                deptValidation.setEmptyCellAllowed(true);
+                sheet.addValidationData(deptValidation);
             }
             wb.write(out);
         }
