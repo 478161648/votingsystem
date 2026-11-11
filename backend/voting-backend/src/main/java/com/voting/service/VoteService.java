@@ -93,8 +93,20 @@ public class VoteService {
                         .eq(Candidate::getThemeId, themeId)
                         .orderByAsc(Candidate::getCategoryId)
                         .orderByAsc(Candidate::getSort));
+
+        // 平票重投阶段：只展示「已当选」和「平票待重投」两类候选，落选的隐藏
+        //   已当选   : is_winner = 1
+        //   平票待投 : is_winner = 0 且 rank 不为空（上轮并列）
+        //   落选     : is_winner = 0 且 rank 为空  → 不返回给投票端
+        boolean revotePhase = "TIE_REVOTE".equals(theme.getStatus());
+
         List<Map<String, Object>> candRows = new ArrayList<>();
         for (Candidate c : cands) {
+            if (revotePhase
+                    && !Boolean.TRUE.equals(c.getIsWinner())
+                    && c.getRank() == null) {
+                continue;
+            }
             Map<String, Object> row = new HashMap<>();
             row.put("id", c.getId());
             row.put("name", c.getName());
