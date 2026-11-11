@@ -88,7 +88,7 @@
                       <div v-if="fields.length" class="cand-fields">
                         <div v-for="(f, fi) in fields" :key="f.fieldLabel" class="cf" :class="{ wide: isWideField(fi) }">
                           <span class="cf-k">{{ f.fieldLabel }}</span>
-                          <span class="cf-v">{{ fieldValue(c, f) }}</span>
+                          <span class="cf-v" :title="cellTitle(c, f)">{{ fieldValue(c, f) }}</span>
                         </div>
                       </div>
                     </span>
@@ -491,6 +491,17 @@ function isWideField(fi) {
 function fieldValue(c, f) {
   const v = c.extraMap?.[f.fieldLabel]
   return v !== undefined && v !== null && v !== '' ? v : '—'
+}
+
+/**
+ * 原生 title 提示：仅当内容足够长（会被单行省略号截断）时才设置，
+ * 避免「79」「是」「否」这类短值也弹出提示框。
+ */
+function cellTitle(c, f) {
+  const v = fieldValue(c, f)
+  if (v === '—') return ''
+  const s = String(v)
+  return s.length > 8 ? s : ''
 }
 
 async function submit() {
