@@ -162,7 +162,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { voteThemes, voteThemeDetail, voteRevoteInfo, submitVote } from '../../api'
 import { useUserStore } from '../../store/user'
 import { wsClient } from '../../utils/ws'
@@ -505,6 +505,29 @@ function cellTitle(c, f) {
 }
 
 async function submit() {
+  const max = totalQuota.value
+  const cur = selectedCount.value
+  // 重投阶段 totalQuota 返回的是「空缺数」（已当选名额已扣除），标签随之变化
+  const label = (phase.value === 'REVOTE' && !voted.value) ? '可重投' : '可投总数'
+
+  const html = `
+    <div class="vc-body">
+      <div class="vc-row"><span class="vc-k">${label}</span><span class="vc-v">${max}</span></div>
+      <div class="vc-row"><span class="vc-k">已选择</span><span class="vc-v">${cur}</span></div>
+      ${cur === 0 ? '<div class="vc-warn">未选择任何候选，提交视为弃权</div>' : ''}
+    </div>`
+
+  try {
+    await ElMessageBox.confirm(html, '确认提交投票', {
+      confirmButtonText: '继续提交',
+      cancelButtonText: '取消',
+      dangerouslyUseHTMLString: true,
+      customClass: 'vote-confirm-box'
+    })
+  } catch {
+    return // 点取消 / 关闭 / 按 ESC → 不提交
+  }
+
   const ids = [...selected.value]
   await submitVote(themeId.value, ids)
   voted.value = true
@@ -661,4 +684,28 @@ const statusTag = s => STATUS[s]?.tag || 'info'
   .ctrl-grid { grid-template-columns: 1fr; }
   .side-col { position: static; }
 }
+
+/* ========== 提交投票确认框 ==========
+   ElMessageBox 挂载在 document.body 上，不在组件作用域内，
+   scoped 样式无法命中，必须用 :global() 包裹 */
+:global(.vote-confirm-box) { border-radius: 14px; padding: 22px 24px; }
+:global(.vote-confirm-box .el-message-box__title) {
+  font-size: 1.15rem; font-weight: 800; color: #000;
+}
+:global(.vote-confirm-box .vc-body) { padding: 6px 0 2px; }
+:global(.vote-confirm-box .vc-row) {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 32px; margin: 14px 0;
+}
+:global(.vote-confirm-box .vc-k) {
+  font-size: 1.05rem; font-weight: 700; color: #000;
+}
+:global(.vote-confirm-box .vc-v) {
+  font-size: 2rem; font-weight: 900; color: #000; line-height: 1;
+  letter-spacing: -.5px;
+}
+:global(.vote-confirm-box .vc-warn) {
+  margin-top: 16px; font-size: .92rem; font-weight: 700; color: #e07b00;
+}
+:global(.vote-confirm-box .el-button) { font-weight: 700; }
 </style>
